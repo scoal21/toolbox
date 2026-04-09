@@ -154,7 +154,7 @@
 
             var photosHtml = '';
             box.photos.forEach(url => { photosHtml += `<img src="${url}" style="width:48%; margin:1%; border-radius:4px; cursor:pointer; border:1px solid #ddd;" onclick="window.open('${url}')" />`; });
-            var photoUploadSection = box.photos.length < 2 ? `<label class="photo-upload-label">📸 현장 사진 추가 (최대 2장)<input type="file" accept="image/*" capture="environment" onchange="uploadAndResizeImage(event, '${boxId}')"></label>` : `<div style="text-align:center; font-size:11px; color:#555;">✅ 사진 2장 등록 완료 <button onclick="resetPhotos('${boxId}')" style="margin-left:5px; font-size:10px;">초기화</button></div>`;
+            var photoUploadSection = box.photos.length < 2 ? `<label class="photo-upload-label">📸 현장 사진 추가 (최대 2장)<input type="file" id="photoInput" accept="image/*" multiple> onchange="uploadAndResizeImage(event, '${boxId}')"></label>` : `<div style="text-align:center; font-size:11px; color:#555;">✅ 사진 2장 등록 완료 <button onclick="resetPhotos('${boxId}')" style="margin-left:5px; font-size:10px;">초기화</button></div>`;
 
             // 잠금 상태에 따른 UI 변경
             var lockBtnText = box.is_locked ? "🔒 해제" : "🔓 잠금";
