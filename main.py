@@ -20,7 +20,7 @@ app = FastAPI()
 # ⚙️ 구글 드라이브 설정 (Render 환경변수)
 # ==========================================
 FOLDER_ID = "1JW2F_eha2NfsUOWB0q9al7E__n20sMk_"
-MAP_FILE_ID = os.environ.get("14BI4mQEE3RCgTksZ7XTYDbwraWr-L8-l")
+MAP_FILE_ID = "14BI4mQEE3RCgTksZ7XTYDbwraWr-L8-l"
 DB_FILENAME = "yard_tools.db"
 
 def get_gdrive_service():
