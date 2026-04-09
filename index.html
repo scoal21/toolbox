@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>의장1부 툴박스 네비게이터</title>
+    <title> 의장1부 툴박스 네비게이터</title>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #2c3e50; font-family: 'Malgun Gothic', sans-serif; }
         
@@ -20,11 +20,14 @@
         #map-container { position: relative; width: 100vw; height: 100vh; overflow: auto; cursor: grab; }
         #yard-map { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
         
-        /* 툴박스 마커 (50% 축소) */
-        .marker { position: absolute; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: translate(-50%, -50%); cursor: pointer; transition: transform 0.1s; }
+        /* 툴박스 마커 */
+        .marker { position: absolute; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: translate(-50%, -50%); cursor: pointer; transition: all 0.2s; }
         .marker:active { transform: translate(-50%, -50%) scale(1.5); }
         .marker-label { display: none; } 
         
+        /* 검색 하이라이트 효과 */
+        .highlight-search { transform: translate(-50%, -50%) scale(1.8) !important; border: 3px solid #00ff00 !important; box-shadow: 0 0 15px #00ff00 !important; z-index: 999; }
+
         /* 상태 애니메이션 */
         .status-warning { animation: blink-warning 1s infinite alternate; }
         .status-shortage { animation: blink-shortage 0.4s infinite alternate; }
@@ -45,8 +48,10 @@
         .material-item { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; border: 1px solid #e0e0e0; font-size: 13px; }
         .material-del-btn { color: #e74c3c; cursor: pointer; font-weight: bold; border: none; background: none; font-size: 16px; padding: 0 5px; }
 
-        /* 사진 영역 */
-        .photo-area { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; }
+        /* 사진 영역 및 삭제 버튼 래퍼 */
+        .photo-area { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; align-items: center; }
+        .photo-wrapper { position: relative; display: inline-block; flex-shrink: 0; margin-top: 5px; }
+        .photo-del-btn { position: absolute; top: -8px; right: -8px; background-color: #e74c3c; color: white; border-radius: 50%; width: 22px; height: 22px; border: 2px solid white; font-weight: bold; font-size: 12px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.4); z-index: 10; }
         .photo-thumb { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; border: 1px solid #eee; transition: transform 0.2s; }
         .photo-thumb:active { transform: scale(0.95); }
         
@@ -63,7 +68,7 @@
 <body>
 
     <div id="ui-bar">
-        <input type="text" id="search-box" placeholder="툴박스명 검색..." onkeyup="searchBox()">
+        <input type="text" id="search-box" placeholder="툴박스명 또는 자재 검색..." oninput="searchBox()">
         <button class="btn btn-add" onclick="addNewBox()">+ 추가</button>
         <button id="lock-btn" class="btn btn-lock unlocked" onclick="toggleLock()">잠금 OFF</button>
         <button class="btn btn-excel" onclick="downloadExcel()">📥 엑셀</button>
@@ -97,7 +102,7 @@
                 <select id="p-status" class="form-control">
                     <option value="정상">🟢 정상</option>
                     <option value="경고">🟠 경고</option>
-                    <option value="부족">🔴 자재부족</option>
+                    <option value="과보유">🔴 과보유</option>
                 </select>
             </div>
             <div style="flex:2;">
@@ -120,8 +125,7 @@
 
         <div class="form-group" style="border-top: 1px dashed #bdc3c7; padding-top: 15px;">
             <label>자재 목록 및 추가</label>
-            <div id="p-materials-list" style="max-height: 120px; overflow-y: auto; margin-bottom: 10px;">
-                </div>
+            <div id="p-materials-list" style="max-height: 120px; overflow-y: auto; margin-bottom: 10px;"></div>
             <div style="display: flex; gap: 5px;">
                 <input type="text" id="m-name" class="form-control" placeholder="품명 (예: 용접봉)" style="flex: 2; padding: 8px;">
                 <input type="text" id="m-qty" class="form-control" placeholder="수량 (예: 2)" style="flex: 1; padding: 8px;">
@@ -158,6 +162,7 @@
                 const res = await fetch('/api/toolboxes');
                 toolboxes = await res.json();
                 renderMap();
+                searchBox(); 
             } catch (e) { console.error('데이터 로딩 실패:', e); }
         }
 
@@ -174,7 +179,7 @@
                 }
 
                 if(statusStr === "경고") el.classList.add('status-warning');
-                if(statusStr === "부족") el.classList.add('status-shortage');
+                if(statusStr === "과보유") el.classList.add('status-shortage');
 
                 el.style.backgroundColor = box.color || 'blue';
                 el.style.left = box.lat + 'px';
@@ -280,13 +285,17 @@
             document.getElementById('p-status').value = statusStr;
             document.getElementById('p-warning-text').value = textStr;
             
-            // 자재 목록 렌더링
             renderMaterialsList();
 
             const photoArea = document.getElementById('p-photo-area');
             photoArea.innerHTML = '';
-            box.photos.forEach(p => {
-                photoArea.innerHTML += `<img src="${p}" class="photo-thumb" onclick="openModal('${p}')">`;
+            box.photos.forEach((p, index) => {
+                photoArea.innerHTML += `
+                    <div class="photo-wrapper">
+                        <button class="photo-del-btn" onclick="deletePhoto(${index}, event)">✖</button>
+                        <img src="${p}" class="photo-thumb" onclick="openModal('${p}')">
+                    </div>
+                `;
             });
 
             document.getElementById('popup').style.display = 'block';
@@ -297,7 +306,23 @@
             currentBoxId = null;
         }
 
-        // 🌟 자재 렌더링 함수 🌟
+        async function deletePhoto(index, event) {
+            event.stopPropagation(); 
+            if(!confirm('이 사진을 정말 삭제하시겠습니까?')) return;
+            
+            const box = toolboxes.find(b => b.id === currentBoxId);
+            box.photos.splice(index, 1); 
+            
+            try {
+                await fetch(`/api/toolboxes/${box.id}`, {
+                    method: 'PUT', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(box)
+                });
+                openPopup(currentBoxId); 
+            } catch(e) { alert('사진 삭제 실패'); }
+        }
+
         function renderMaterialsList() {
             const box = toolboxes.find(b => b.id === currentBoxId);
             const listDiv = document.getElementById('p-materials-list');
@@ -319,28 +344,22 @@
             });
         }
 
-        // 🌟 자재 추가 함수 🌟
         function addMaterial() {
             const name = document.getElementById('m-name').value.trim();
             const qty = document.getElementById('m-qty').value.trim();
             const note = document.getElementById('m-note').value.trim();
-            
             if(!name) { alert('자재 품명을 입력해주세요.'); return; }
             
             const box = toolboxes.find(b => b.id === currentBoxId);
             if(!box.materials) box.materials = [];
             
             box.materials.push({ name, qty, note });
-            
-            // 입력창 초기화
             document.getElementById('m-name').value = '';
             document.getElementById('m-qty').value = '';
             document.getElementById('m-note').value = '';
-            
             renderMaterialsList();
         }
 
-        // 🌟 자재 삭제 함수 🌟
         function removeMaterial(index) {
             const box = toolboxes.find(b => b.id === currentBoxId);
             box.materials.splice(index, 1);
@@ -416,20 +435,45 @@
             }
         }
 
+        // 🌟 통합 검색 기능 (툴박스 이름 + 자재 목록 동시 검색) 🌟
         function searchBox() {
-            const text = document.getElementById('search-box').value.toLowerCase();
-            document.querySelectorAll('.marker').forEach(marker => {
-                const name = marker.querySelector('.marker-label').innerText.toLowerCase();
-                marker.style.display = name.includes(text) ? 'block' : 'none';
+            const text = document.getElementById('search-box').value.toLowerCase().trim();
+            
+            toolboxes.forEach(box => {
+                const marker = document.getElementById('marker-' + box.id);
+                if (!marker) return;
+
+                // 1. 툴박스 이름에서 검색
+                const nameMatch = box.name.toLowerCase().includes(text);
+
+                // 2. 자재 목록에서 검색 (품명 또는 비고란 포함)
+                let materialMatch = false;
+                if (box.materials && box.materials.length > 0) {
+                    materialMatch = box.materials.some(m => 
+                        m.name.toLowerCase().includes(text) || 
+                        (m.note && m.note.toLowerCase().includes(text))
+                    );
+                }
+
+                // 3. 디스플레이 및 하이라이트 제어
+                if (text === '') {
+                    marker.style.display = 'block';
+                    marker.classList.remove('highlight-search');
+                } 
+                else if (nameMatch || materialMatch) {
+                    marker.style.display = 'block';
+                    marker.classList.add('highlight-search');
+                } 
+                else {
+                    marker.style.display = 'none';
+                    marker.classList.remove('highlight-search');
+                }
             });
         }
 
-        // 엑셀 다운로드 (자재 목록 포함)
         function downloadExcel() {
             if (toolboxes.length === 0) { alert('데이터가 없습니다.'); return; }
-            
             let csv = '툴박스명,위도(X),경도(Y),색상분류,정담당자,부담당자,상태,특이사항,자재목록\n';
-            
             toolboxes.forEach(b => {
                 let statusStr = "정상", textStr = b.warning || "";
                 if(textStr.startsWith("{")) {
@@ -439,21 +483,16 @@
                         textStr = parsed.text || "";
                     } catch(e){}
                 }
-
-                // 자재 목록을 텍스트로 예쁘게 변환 (예: "용접봉(2), 그라인더(1)")
                 let materialsStr = "";
                 if(b.materials && b.materials.length > 0) {
                     materialsStr = b.materials.map(m => `${m.name}(${m.qty})`).join(', ');
                 }
-
                 let row = [
                     b.name, Math.round(b.lat), Math.round(b.lng), b.color, 
                     b.manager_main, b.manager_sub, statusStr, textStr, materialsStr
                 ].map(v => `"${(v||'').toString().replace(/"/g, '""')}"`).join(',');
-                
                 csv += row + '\n';
             });
-            
             const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
