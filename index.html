@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title> 의장1부 툴박스 네비게이터</title>
+    <title>의장1부 툴박스 네비게이터</title>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #2c3e50; font-family: 'Malgun Gothic', sans-serif; }
         
-        /* 상단 UI 바 */
         #ui-bar { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1000; display: flex; gap: 8px; flex-wrap: wrap; }
         #search-box { flex: 1; min-width: 120px; padding: 10px; border-radius: 8px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-size: 14px; }
         .btn { padding: 10px 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); cursor: pointer; color: white; white-space: nowrap; }
@@ -16,25 +15,20 @@
         .btn-lock.unlocked { background-color: #f39c12; }
         .btn-excel { background-color: #207245; }
 
-        /* 야드 맵 컨테이너 */
         #map-container { position: relative; width: 100vw; height: 100vh; overflow: auto; cursor: grab; }
         #yard-map { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
         
-        /* 툴박스 마커 */
         .marker { position: absolute; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: translate(-50%, -50%); cursor: pointer; transition: all 0.2s; }
         .marker:active { transform: translate(-50%, -50%) scale(1.5); }
         .marker-label { display: none; } 
         
-        /* 검색 하이라이트 효과 */
         .highlight-search { transform: translate(-50%, -50%) scale(1.8) !important; border: 3px solid #00ff00 !important; box-shadow: 0 0 15px #00ff00 !important; z-index: 999; }
 
-        /* 상태 애니메이션 */
         .status-warning { animation: blink-warning 1s infinite alternate; }
         .status-shortage { animation: blink-shortage 0.4s infinite alternate; }
         @keyframes blink-warning { from { box-shadow: 0 0 2px orange; border-color: orange; } to { box-shadow: 0 0 15px orange; border-color: white; } }
         @keyframes blink-shortage { from { box-shadow: 0 0 2px red; border-color: red; } to { box-shadow: 0 0 20px red; border-color: white; } }
 
-        /* 팝업 창 */
         #popup { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 20px 20px 0 0; padding: 20px; z-index: 2000; box-shadow: 0 -5px 15px rgba(0,0,0,0.3); max-height: 85vh; overflow-y: auto; }
         .popup-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .popup-header input { font-size: 20px; font-weight: bold; border: none; border-bottom: 2px solid #3498db; width: 70%; padding: 5px; }
@@ -44,11 +38,9 @@
         .form-group label { display: block; font-size: 12px; color: #7f8c8d; margin-bottom: 5px; font-weight: bold; }
         .form-control { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
         
-        /* 자재 목록 스타일 */
         .material-item { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; border: 1px solid #e0e0e0; font-size: 13px; }
         .material-del-btn { color: #e74c3c; cursor: pointer; font-weight: bold; border: none; background: none; font-size: 16px; padding: 0 5px; }
 
-        /* 사진 영역 및 삭제 버튼 래퍼 */
         .photo-area { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; align-items: center; }
         .photo-wrapper { position: relative; display: inline-block; flex-shrink: 0; margin-top: 5px; }
         .photo-del-btn { position: absolute; top: -8px; right: -8px; background-color: #e74c3c; color: white; border-radius: 50%; width: 22px; height: 22px; border: 2px solid white; font-weight: bold; font-size: 12px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.4); z-index: 10; }
@@ -59,7 +51,6 @@
         .btn-save { flex: 2; background-color: #3498db; }
         .btn-delete { flex: 1; background-color: #e74c3c; }
 
-        /* 사진 모달 */
         #imageModal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); text-align: center; }
         .modal-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; }
         #modalImage { margin-top: 10vh; max-width: 95%; max-height: 80vh; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); object-fit: contain; }
@@ -181,7 +172,7 @@
                 if(statusStr === "경고") el.classList.add('status-warning');
                 if(statusStr === "과보유") el.classList.add('status-shortage');
 
-                el.style.backgroundColor = box.color || 'blue';
+                el.style.backgroundColor = box.color || 'red'; // 기본값 Red
                 el.style.left = box.lat + 'px';
                 el.style.top = box.lng + 'px';
                 el.id = 'marker-' + box.id;
@@ -252,15 +243,32 @@
             el.addEventListener('touchstart', startDrag, {passive: false});
         }
 
-        function addNewBox() {
+        // 🔥 새 툴박스 생성 로직: 프론트에만 띄우지 않고 서버에 즉시 POST 생성 🔥
+        async function addNewBox() {
             const newId = 'TB-' + Date.now();
             const newBox = {
                 id: newId, name: '새 툴박스', lat: window.innerWidth / 2, lng: 200, 
                 color: 'red', manager_main: '', manager_sub: '', materials: [], warning: '', photos: [], is_locked: false
             };
-            toolboxes.push(newBox);
-            renderMap();
-            openPopup(newId);
+
+            try {
+                // 추가 버튼을 누르자마자 서버(DB)에 빈 툴박스를 먼저 등록합니다.
+                const res = await fetch('/api/toolboxes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newBox)
+                });
+                
+                if(res.ok) {
+                    toolboxes.push(newBox);
+                    renderMap();
+                    openPopup(newId);
+                } else {
+                    alert('서버 등록에 실패했습니다. 새로고침 후 다시 시도해주세요.');
+                }
+            } catch(e) {
+                alert('통신 오류: 새 툴박스를 추가할 수 없습니다.');
+            }
         }
 
         function openPopup(id) {
@@ -380,6 +388,7 @@
             box.warning = JSON.stringify(statusObj);
 
             try {
+                // 이미 POST로 집이 만들어져 있으므로 PUT으로 안전하게 수정
                 await fetch(`/api/toolboxes/${box.id}`, {
                     method: 'PUT', 
                     headers: { 'Content-Type': 'application/json' },
@@ -435,7 +444,6 @@
             }
         }
 
-        // 🌟 통합 검색 기능 (툴박스 이름 + 자재 목록 동시 검색) 🌟
         function searchBox() {
             const text = document.getElementById('search-box').value.toLowerCase().trim();
             
@@ -443,10 +451,8 @@
                 const marker = document.getElementById('marker-' + box.id);
                 if (!marker) return;
 
-                // 1. 툴박스 이름에서 검색
                 const nameMatch = box.name.toLowerCase().includes(text);
 
-                // 2. 자재 목록에서 검색 (품명 또는 비고란 포함)
                 let materialMatch = false;
                 if (box.materials && box.materials.length > 0) {
                     materialMatch = box.materials.some(m => 
@@ -455,7 +461,6 @@
                     );
                 }
 
-                // 3. 디스플레이 및 하이라이트 제어
                 if (text === '') {
                     marker.style.display = 'block';
                     marker.classList.remove('highlight-search');
