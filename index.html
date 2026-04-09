@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>의장1부 툴박스 네비게이터</title>
+    <title> 의장1부 툴박스 네비게이터</title>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #2c3e50; font-family: 'Malgun Gothic', sans-serif; }
         
+        /* 상단 UI 바 */
         #ui-bar { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1000; display: flex; gap: 8px; flex-wrap: wrap; }
         #search-box { flex: 1; min-width: 120px; padding: 10px; border-radius: 8px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-size: 14px; }
         .btn { padding: 10px 12px; border-radius: 8px; border: none; font-weight: bold; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); cursor: pointer; color: white; white-space: nowrap; }
@@ -15,20 +16,25 @@
         .btn-lock.unlocked { background-color: #f39c12; }
         .btn-excel { background-color: #207245; }
 
+        /* 야드 맵 컨테이너 */
         #map-container { position: relative; width: 100vw; height: 100vh; overflow: auto; cursor: grab; }
         #yard-map { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
         
+        /* 툴박스 마커 */
         .marker { position: absolute; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: translate(-50%, -50%); cursor: pointer; transition: all 0.2s; }
         .marker:active { transform: translate(-50%, -50%) scale(1.5); }
         .marker-label { display: none; } 
         
+        /* 검색 하이라이트 효과 */
         .highlight-search { transform: translate(-50%, -50%) scale(1.8) !important; border: 3px solid #00ff00 !important; box-shadow: 0 0 15px #00ff00 !important; z-index: 999; }
 
+        /* 상태 애니메이션 */
         .status-warning { animation: blink-warning 1s infinite alternate; }
         .status-shortage { animation: blink-shortage 0.4s infinite alternate; }
         @keyframes blink-warning { from { box-shadow: 0 0 2px orange; border-color: orange; } to { box-shadow: 0 0 15px orange; border-color: white; } }
         @keyframes blink-shortage { from { box-shadow: 0 0 2px red; border-color: red; } to { box-shadow: 0 0 20px red; border-color: white; } }
 
+        /* 팝업 창 */
         #popup { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 20px 20px 0 0; padding: 20px; z-index: 2000; box-shadow: 0 -5px 15px rgba(0,0,0,0.3); max-height: 85vh; overflow-y: auto; }
         .popup-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .popup-header input { font-size: 20px; font-weight: bold; border: none; border-bottom: 2px solid #3498db; width: 70%; padding: 5px; }
@@ -38,9 +44,11 @@
         .form-group label { display: block; font-size: 12px; color: #7f8c8d; margin-bottom: 5px; font-weight: bold; }
         .form-control { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
         
+        /* 자재 목록 스타일 */
         .material-item { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; border: 1px solid #e0e0e0; font-size: 13px; }
         .material-del-btn { color: #e74c3c; cursor: pointer; font-weight: bold; border: none; background: none; font-size: 16px; padding: 0 5px; }
 
+        /* 사진 영역 및 삭제 버튼 래퍼 */
         .photo-area { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; align-items: center; }
         .photo-wrapper { position: relative; display: inline-block; flex-shrink: 0; margin-top: 5px; }
         .photo-del-btn { position: absolute; top: -8px; right: -8px; background-color: #e74c3c; color: white; border-radius: 50%; width: 22px; height: 22px; border: 2px solid white; font-weight: bold; font-size: 12px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.4); z-index: 10; }
@@ -51,6 +59,7 @@
         .btn-save { flex: 2; background-color: #3498db; }
         .btn-delete { flex: 1; background-color: #e74c3c; }
 
+        /* 사진 모달 */
         #imageModal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); text-align: center; }
         .modal-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer; }
         #modalImage { margin-top: 10vh; max-width: 95%; max-height: 80vh; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); object-fit: contain; }
@@ -126,9 +135,9 @@
         </div>
 
         <div class="form-group" style="border-top: 1px dashed #bdc3c7; padding-top: 15px;">
-            <label>현장 사진 (앨범 또는 카메라)</label>
+            <label>현장 사진 (자동 압축 전송)</label>
             <input type="file" id="p-photo-input" accept="image/*" class="form-control" multiple>
-            <button onclick="uploadPhoto()" style="width:100%; margin-top:5px; padding:10px; background:#95a5a6; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">사진 업로드 적용</button>
+            <button onclick="uploadPhoto()" style="width:100%; margin-top:5px; padding:10px; background:#95a5a6; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">사진 업로드 (데이터 절약)</button>
             <div id="p-photo-area" class="photo-area"></div>
         </div>
 
@@ -172,7 +181,7 @@
                 if(statusStr === "경고") el.classList.add('status-warning');
                 if(statusStr === "과보유") el.classList.add('status-shortage');
 
-                el.style.backgroundColor = box.color || 'red'; // 기본값 Red
+                el.style.backgroundColor = box.color || 'red'; 
                 el.style.left = box.lat + 'px';
                 el.style.top = box.lng + 'px';
                 el.id = 'marker-' + box.id;
@@ -243,7 +252,6 @@
             el.addEventListener('touchstart', startDrag, {passive: false});
         }
 
-        // 🔥 새 툴박스 생성 로직: 프론트에만 띄우지 않고 서버에 즉시 POST 생성 🔥
         async function addNewBox() {
             const newId = 'TB-' + Date.now();
             const newBox = {
@@ -252,7 +260,6 @@
             };
 
             try {
-                // 추가 버튼을 누르자마자 서버(DB)에 빈 툴박스를 먼저 등록합니다.
                 const res = await fetch('/api/toolboxes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -263,12 +270,8 @@
                     toolboxes.push(newBox);
                     renderMap();
                     openPopup(newId);
-                } else {
-                    alert('서버 등록에 실패했습니다. 새로고침 후 다시 시도해주세요.');
-                }
-            } catch(e) {
-                alert('통신 오류: 새 툴박스를 추가할 수 없습니다.');
-            }
+                } else { alert('서버 등록에 실패했습니다.'); }
+            } catch(e) { alert('통신 오류: 새 툴박스를 추가할 수 없습니다.'); }
         }
 
         function openPopup(id) {
@@ -297,13 +300,22 @@
 
             const photoArea = document.getElementById('p-photo-area');
             photoArea.innerHTML = '';
-            box.photos.forEach((p, index) => {
-                photoArea.innerHTML += `
-                    <div class="photo-wrapper">
-                        <button class="photo-del-btn" onclick="deletePhoto(${index}, event)">✖</button>
-                        <img src="${p}" class="photo-thumb" onclick="openModal('${p}')">
-                    </div>
-                `;
+            
+            let photoArray = [];
+            if(Array.isArray(box.photos)) photoArray = box.photos;
+            else if(typeof box.photos === 'string') {
+                try { photoArray = JSON.parse(box.photos) || []; } catch(e){}
+            }
+
+            photoArray.forEach((p, index) => {
+                if(p) {
+                    photoArea.innerHTML += `
+                        <div class="photo-wrapper">
+                            <button class="photo-del-btn" onclick="deletePhoto(${index}, event)">✖</button>
+                            <img src="${p}" class="photo-thumb" onclick="openModal('${p}')">
+                        </div>
+                    `;
+                }
             });
 
             document.getElementById('popup').style.display = 'block';
@@ -336,19 +348,31 @@
             const listDiv = document.getElementById('p-materials-list');
             listDiv.innerHTML = '';
             
-            if(!box.materials || box.materials.length === 0) {
+            let materialsArray = [];
+            if(Array.isArray(box.materials)) materialsArray = box.materials;
+            else if(typeof box.materials === 'string') {
+                try { materialsArray = JSON.parse(box.materials) || []; } catch(e){}
+            }
+
+            if(materialsArray.length === 0) {
                 listDiv.innerHTML = '<div style="font-size:12px; color:#999; text-align:center; padding:5px;">등록된 자재가 없습니다.</div>';
                 return;
             }
             
-            box.materials.forEach((m, index) => {
-                const item = document.createElement('div');
-                item.className = 'material-item';
-                item.innerHTML = `
-                    <span><b>${m.name}</b> <span style="color:#2980b9;">(${m.qty})</span> <span style="color:#7f8c8d; font-size:11px; margin-left:5px;">${m.note || ''}</span></span>
-                    <button class="material-del-btn" onclick="removeMaterial(${index})">✖</button>
-                `;
-                listDiv.appendChild(item);
+            materialsArray.forEach((m, index) => {
+                let mName = (typeof m === 'object' && m !== null) ? m.name : String(m);
+                let mQty = (typeof m === 'object' && m !== null) ? (m.qty || '') : '';
+                let mNote = (typeof m === 'object' && m !== null) ? (m.note || '') : '';
+
+                if(mName) {
+                    const item = document.createElement('div');
+                    item.className = 'material-item';
+                    item.innerHTML = `
+                        <span><b>${mName}</b> <span style="color:#2980b9;">${mQty ? '('+mQty+')' : ''}</span> <span style="color:#7f8c8d; font-size:11px; margin-left:5px;">${mNote}</span></span>
+                        <button class="material-del-btn" onclick="removeMaterial(${index})">✖</button>
+                    `;
+                    listDiv.appendChild(item);
+                }
             });
         }
 
@@ -359,7 +383,7 @@
             if(!name) { alert('자재 품명을 입력해주세요.'); return; }
             
             const box = toolboxes.find(b => b.id === currentBoxId);
-            if(!box.materials) box.materials = [];
+            if(!box.materials || !Array.isArray(box.materials)) box.materials = [];
             
             box.materials.push({ name, qty, note });
             document.getElementById('m-name').value = '';
@@ -370,8 +394,10 @@
 
         function removeMaterial(index) {
             const box = toolboxes.find(b => b.id === currentBoxId);
-            box.materials.splice(index, 1);
-            renderMaterialsList();
+            if(Array.isArray(box.materials)) {
+                box.materials.splice(index, 1);
+                renderMaterialsList();
+            }
         }
 
         async function saveToolbox() {
@@ -388,7 +414,6 @@
             box.warning = JSON.stringify(statusObj);
 
             try {
-                // 이미 POST로 집이 만들어져 있으므로 PUT으로 안전하게 수정
                 await fetch(`/api/toolboxes/${box.id}`, {
                     method: 'PUT', 
                     headers: { 'Content-Type': 'application/json' },
@@ -409,25 +434,53 @@
             } catch (e) { alert('삭제 실패'); }
         }
 
+        // 🔥 이미지 강제 리사이징 및 압축 (DB 용량 획기적 절약) 🔥
         function uploadPhoto() {
             const input = document.getElementById('p-photo-input');
-            if (input.files.length === 0) { alert('사진을 선택해주세요.'); return; }
+            if (input.files.length === 0) { alert('사진을 먼저 선택해주세요.'); return; }
+            
             const file = input.files[0];
             const reader = new FileReader();
-            reader.onload = async function(e) {
-                const base64Data = e.target.result;
-                try {
-                    const res = await fetch(`/api/toolboxes/${currentBoxId}/photos`, {
+            
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    
+                    // 가로폭 최대 600px로 제한 (비율 유지)
+                    const MAX_WIDTH = 600;
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    if (width > MAX_WIDTH) {
+                        height = Math.round(height * (MAX_WIDTH / width));
+                        width = MAX_WIDTH;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // JPEG 압축 (품질 50%) -> 용량이 1/10 수준으로 뚝 떨어집니다.
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5);
+
+                    fetch(`/api/toolboxes/${currentBoxId}/photos`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image_data: base64Data })
-                    });
-                    if(res.ok) {
-                        alert('사진 등록 완료!');
-                        loadData(); 
-                        setTimeout(() => openPopup(currentBoxId), 500);
-                    } else { alert('사진 등록 실패'); }
-                } catch(err) { alert('서버 통신 실패'); }
+                        body: JSON.stringify({ image_data: compressedBase64 })
+                    }).then(res => {
+                        if(res.ok) {
+                            alert('최적화 업로드 완료! (데이터 절약됨)');
+                            loadData();
+                            setTimeout(() => openPopup(currentBoxId), 500);
+                        } else {
+                            alert('사진 등록 실패');
+                        }
+                    }).catch(err => alert('서버 통신 실패'));
+                };
+                img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
@@ -451,14 +504,29 @@
                 const marker = document.getElementById('marker-' + box.id);
                 if (!marker) return;
 
-                const nameMatch = box.name.toLowerCase().includes(text);
+                const safeName = box.name ? box.name.toLowerCase() : '';
+                const nameMatch = safeName.includes(text);
 
                 let materialMatch = false;
-                if (box.materials && box.materials.length > 0) {
-                    materialMatch = box.materials.some(m => 
-                        m.name.toLowerCase().includes(text) || 
-                        (m.note && m.note.toLowerCase().includes(text))
-                    );
+                let materialsArray = [];
+                
+                if (Array.isArray(box.materials)) {
+                    materialsArray = box.materials;
+                } else if (typeof box.materials === 'string') {
+                    try { materialsArray = JSON.parse(box.materials) || []; } catch(e) {}
+                }
+
+                if (materialsArray.length > 0) {
+                    materialMatch = materialsArray.some(m => {
+                        if (typeof m === 'string') {
+                            return m.toLowerCase().includes(text);
+                        } else if (typeof m === 'object' && m !== null) {
+                            const mName = m.name ? m.name.toLowerCase() : '';
+                            const mNote = m.note ? m.note.toLowerCase() : '';
+                            return mName.includes(text) || mNote.includes(text);
+                        }
+                        return false;
+                    });
                 }
 
                 if (text === '') {
@@ -488,10 +556,22 @@
                         textStr = parsed.text || "";
                     } catch(e){}
                 }
+                
                 let materialsStr = "";
-                if(b.materials && b.materials.length > 0) {
-                    materialsStr = b.materials.map(m => `${m.name}(${m.qty})`).join(', ');
+                let materialsArray = [];
+                if (Array.isArray(b.materials)) materialsArray = b.materials;
+                else if (typeof b.materials === 'string') {
+                    try { materialsArray = JSON.parse(b.materials) || []; } catch(e){}
                 }
+
+                if(materialsArray.length > 0) {
+                    materialsStr = materialsArray.map(m => {
+                        let mName = (typeof m === 'object' && m !== null) ? m.name : String(m);
+                        let mQty = (typeof m === 'object' && m !== null) ? (m.qty ? `(${m.qty})` : '') : '';
+                        return mName ? mName + mQty : '';
+                    }).filter(Boolean).join(', ');
+                }
+
                 let row = [
                     b.name, Math.round(b.lat), Math.round(b.lng), b.color, 
                     b.manager_main, b.manager_sub, statusStr, textStr, materialsStr
