@@ -12,15 +12,16 @@ import time
 import base64
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+# 🚨 수정됨: MediaIoBaseUpload 추가
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
 
 app = FastAPI()
 
 # ==========================================
-# ⚙️ 구글 드라이브 설정 (Render 환경변수)
+# ⚙️ 구글 드라이브 설정 (직접 입력 방식으로 강제 고정)
 # ==========================================
 FOLDER_ID = "1JW2F_eha2NfsUOWB0q9al7E__n20sMk_"
-MAP_FILE_ID = "14BI4mQEE3RCgTksZ7XTYDbwraWr-L8-l"
+MAP_FILE_ID = "14BI4mQEE3RCgTksZ7XTYDbwraWr-L8-l" 
 DB_FILENAME = "yard_tools.db"
 
 def get_gdrive_service():
@@ -69,7 +70,8 @@ def upload_db_to_drive():
 # 2. 도면 동기화
 def sync_map_from_drive():
     try:
-        if not MAP_FILE_ID: return
+        if not MAP_FILE_ID or MAP_FILE_ID == "여기에_구글드라이브_도면_파일_ID를_다시_넣어주세요": 
+            return
         service = get_gdrive_service()
         request = service.files().get_media(fileId=MAP_FILE_ID)
         fh = io.FileIO("yard_map.jpg", 'wb')
@@ -81,7 +83,7 @@ def sync_map_from_drive():
     except Exception as e:
         print(f"⚠️ 야드 도면 오류: {e}")
 
-# 3. 사진 업로드 처리 (수동 구글 링크 생성)
+# 3. 사진 업로드 처리 (🚨 MediaIoBaseUpload 사용으로 수정 완료)
 def upload_photo_to_drive(filename, base64_data):
     try:
         if "," in base64_data:
@@ -89,7 +91,11 @@ def upload_photo_to_drive(filename, base64_data):
         image_bytes = base64.b64decode(base64_data)
         service = get_gdrive_service()
         file_metadata = {'name': filename, 'parents': [FOLDER_ID]}
-        media = MediaFileUpload(io.BytesIO(image_bytes), mimetype='image/jpeg', resumable=True)
+        
+        # 여기서 메모리 데이터를 안전하게 전달합니다.
+        fh = io.BytesIO(image_bytes)
+        media = MediaIoBaseUpload(fh, mimetype='image/jpeg', resumable=True)
+        
         file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         return f"https://drive.google.com/uc?id={file.get('id')}"
     except Exception as e:
@@ -113,12 +119,10 @@ def init_db():
 
 init_db()
 
-# --- 데이터 모델 (422 에러 방지용으로 느슨하게 설정) ---
 class Toolbox(BaseModel):
     id: str; name: str; lat: float; lng: float; color: str; manager_main: str; manager_sub: str
     materials: list = []; warning: str = ""; photos: list = []; is_locked: bool = False
 
-# --- API 엔드포인트 ---
 @app.get("/", response_class=HTMLResponse)
 async def get_webpage():
     with open("index.html", "r", encoding="utf-8") as f:
@@ -169,7 +173,6 @@ async def delete_toolbox(box_id: str):
     upload_db_to_drive()
     return {"message": "삭제 완료"}
 
-# 🔥 누락되었던 핵심 사진 업로드 창구 (404 에러 해결)
 @app.post("/api/toolboxes/{box_id}/photos")
 async def upload_photo(box_id: str, payload: dict):
     image_data = payload.get("image_data")
