@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>야드 툴박스 관리 맵</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Malgun Gothic', sans-serif; }
+        #map { width: 100vw; height: 100vh; background-color: #e0e0e0; }
+        
+        #control-panel { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; gap: 10px; align-items: center; }
+        .btn-toggle { padding: 8px 15px; font-weight: bold; cursor: pointer; border: 1px solid #ccc; background-color: #fff; border-radius: 4px; }
+        .btn-toggle.active { background-color: #ffeb3b; border-color: #d39e00; }
+        .btn-excel { padding: 8px 15px; font-weight: bold; cursor: pointer; border: none; background-color: #107c41; color: white; border-radius: 4px; }
+
+        .search-container { display: flex; align-items: center; background: #f1f3f4; border-radius: 4px; padding: 2px 10px; border: 1px solid #ddd; }
+        #search-input { border: none; background: transparent; padding: 8px; width: 200px; outline: none; font-size: 14px; }
+        
+        #input-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 320px; background: white; padding: 20px; box-shadow: 0px 0px 20px rgba(0,0,0,0.5); z-index: 2000; border-radius: 10px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555; }
+        .form-group input, .form-group select { width: 100%; padding: 7px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .btn { padding: 10px 15px; cursor: pointer; margin-top: 10px; border: none; border-radius: 4px; font-weight: bold; }
+        .btn-save { background-color: #28a745; color: white; width: 100%; }
+        .btn-cancel { background-color: #6c757d; color: white; width: 100%; margin-top: 5px; }
+
+        .marker-inner { width: 100%; height: 100%; border-radius: 50%; border: 2px solid white; box-sizing: border-box; transition: all 0.3s ease; box-shadow: 0 0 4px rgba(0,0,0,0.6); }
+        .highlighted-inner { box-shadow: 0 0 15px 5px rgba(255, 255, 0, 0.8) !important; transform: scale(1.8); border: 3px solid #000 !important; }
+        .dimmed-inner { opacity: 0.2 !important; filter: grayscale(80%); }
+
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); } }
+        @keyframes pulse-orange { 0% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 165, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0); } }
+        .warning-over { animation: pulse-red 1.5s infinite !important; border: 3px solid red !important; }
+        .warning-under { animation: pulse-orange 1.5s infinite !important; border: 3px solid orange !important; }
+
+        .leaflet-popup-content { width: 280px; }
+        .mat-list { font-size: 13px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; max-height: 100px; overflow-y: auto; }
+        .btn-delete { background: #ff4d4d; color: white; border: none; border-radius: 3px; cursor: pointer; float: right; padding: 2px 6px; font-size: 11px; }
+        
+        /* 잠금 버튼 스타일 */
+        .btn-lock { border: none; border-radius: 3px; cursor: pointer; float: right; padding: 2px 6px; font-size: 11px; margin-right: 5px; font-weight: bold; }
+        
+        .warning-btns { display: flex; gap: 5px; margin-bottom: 8px; }
+        .warning-btns button { flex: 1; font-size: 11px; padding: 4px; cursor: pointer; border: 1px solid #ccc; border-radius: 3px; background: #f8f9fa; }
+        .photo-upload-label { display: block; width: 100%; text-align: center; background: #007bff; color: white; padding: 6px 0; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
+        .photo-upload-label input { display: none; }
+    </style>
+</head>
+<body>
+    <div id="control-panel">
+        <button id="add-mode-btn" class="btn-toggle" onclick="toggleAddMode()">➕ 추가 모드 (OFF)</button>
+        <button class="btn-excel" onclick="downloadExcel()">📊 엑셀 다운로드</button>
+        <div class="search-container">
+            🔍 <input type="text" id="search-input" placeholder="자재명 검색" onkeyup="searchMaterials()">
+        </div>
+    </div>
+    <div id="map"></div>
+
+    <div id="input-modal">
+        <h3 style="margin-top:0">신규 툴박스 등록</h3>
+        <div class="form-group"><label>툴박스 명칭</label><input type="text" id="box-name"></div>
+        <div class="form-group">
+            <label>공정 색상</label>
+            <select id="box-color">
+                <option value="red">배관 (Red)</option>
+                <option value="blue">철의장 (Blue)</option>
+                <option value="green">전장 (Green)</option>
+                <option value="orange">도장 (Orange)</option>
+                <option value="purple">기장 (Purple)</option>
+                <option value="cyan">계장 (Cyan)</option>
+            </select>
+        </div>
+        <div class="form-group"><label>정 담당자</label><input type="text" id="manager-main"></div>
+        <div class="form-group"><label>부 담당자</label><input type="text" id="manager-sub"></div>
+        <button class="btn btn-save" onclick="createToolbox()">저장하기</button>
+        <button class="btn btn-cancel" onclick="closeModal()">취소</button>
+    </div>
+
+    <script>
+        var map = L.map('map', { crs: L.CRS.Simple, minZoom: -2 });
+        var imageUrl = '/static/yard_map.jpg'; 
+        var imageBounds = [[0, 0], [800, 1000]]; 
+        L.imageOverlay(imageUrl, imageBounds).addTo(map);
+        map.fitBounds(imageBounds);
+
+        var isAddMode = false;
+        var tempLatLng = null;
+        var toolboxesData = {}; 
+        var markers = {}; 
+
+        function toggleAddMode() {
+            isAddMode = !isAddMode;
+            var btn = document.getElementById('add-mode-btn');
+            btn.className = isAddMode ? "btn-toggle active" : "btn-toggle";
+            btn.innerText = isAddMode ? "➕ 추가 모드 (ON)" : "➕ 추가 모드 (OFF)";
+            map.getContainer().style.cursor = isAddMode ? 'crosshair' : '';
+        }
+
+        map.on('click', function(e) {
+            if (!isAddMode) return;
+            tempLatLng = e.latlng;
+            document.getElementById('input-modal').style.display = 'block';
+        });
+
+        function closeModal() { document.getElementById('input-modal').style.display = 'none'; }
+
+        function createToolbox() {
+            var boxName = document.getElementById('box-name').value || "미지정";
+            var newBox = {
+                id: "TB-" + Date.now(), name: boxName, lat: tempLatLng.lat, lng: tempLatLng.lng,
+                color: document.getElementById('box-color').value,
+                manager_main: document.getElementById('manager-main').value,
+                manager_sub: document.getElementById('manager-sub').value,
+                materials: [], warning: "", photos: [], is_locked: false
+            };
+            fetch('/api/toolboxes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newBox) })
+            .then(() => { toolboxesData[newBox.id] = newBox; renderMarker(newBox); closeModal(); toggleAddMode(); });
+        }
+
+        function renderMarker(box) {
+            var icon = L.divIcon({
+                className: '', 
+                html: `<div id="inner-${box.id}" class="marker-inner" style="background-color:${box.color};"></div>`,
+                iconSize: [16, 16], iconAnchor: [8, 8]
+            });
+
+            if(markers[box.id]) { map.removeLayer(markers[box.id]); }
+
+            // 잠금 상태에 따라 드래그 가능 여부 설정
+            var marker = L.marker([box.lat, box.lng], { icon: icon, draggable: !box.is_locked }).addTo(map);
+            markers[box.id] = marker;
+
+            marker.on('dragend', function() {
+                var pos = marker.getLatLng();
+                box.lat = pos.lat; box.lng = pos.lng;
+                updateServer(box);
+            });
+
+            setTimeout(() => {
+                var innerElement = document.getElementById('inner-' + box.id);
+                if(box.warning === 'over') innerElement.classList.add('warning-over');
+                else if(box.warning === 'under') innerElement.classList.add('warning-under');
+            }, 50);
+
+            updatePopupContent(box.id);
+        }
+
+        function updatePopupContent(boxId) {
+            var box = toolboxesData[boxId];
+            var matHtml = box.materials.map(m => `<div>• ${m.name} (${m.qty})</div>`).join('') || "<span style='color:gray'>내역 없음</span>";
+            var overStyle = box.warning === 'over' ? "background:#ff4d4d; color:white;" : "";
+            var underStyle = box.warning === 'under' ? "background:#ffa500; color:white;" : "";
+            var normalStyle = box.warning === '' ? "background:#28a745; color:white;" : "";
+
+            var photosHtml = '';
+            box.photos.forEach(url => { photosHtml += `<img src="${url}" style="width:48%; margin:1%; border-radius:4px; cursor:pointer; border:1px solid #ddd;" onclick="window.open('${url}')" />`; });
+            var photoUploadSection = box.photos.length < 2 ? `<label class="photo-upload-label">📸 현장 사진 추가 (최대 2장)<input type="file" accept="image/*" capture="environment" onchange="uploadAndResizeImage(event, '${boxId}')"></label>` : `<div style="text-align:center; font-size:11px; color:#555;">✅ 사진 2장 등록 완료 <button onclick="resetPhotos('${boxId}')" style="margin-left:5px; font-size:10px;">초기화</button></div>`;
+
+            // 잠금 상태에 따른 UI 변경
+            var lockBtnText = box.is_locked ? "🔒 해제" : "🔓 잠금";
+            var lockBtnStyle = box.is_locked ? "background:#6c757d; color:white;" : "background:#ffc107; color:#000;";
+            // 잠금 상태면 삭제 버튼 아예 렌더링 안함
+            var deleteBtnHtml = box.is_locked ? "" : `<button class="btn-delete" onclick="deleteToolbox('${boxId}')">삭제</button>`;
+            var nameEditHtml = box.is_locked ? "" : `<button style="font-size:11px; cursor:pointer;" onclick="editName('${boxId}')">[이름변경]</button>`;
+
+            var content = `
+                ${deleteBtnHtml}
+                <button class="btn-lock" style="${lockBtnStyle}" onclick="toggleLock('${boxId}')">${lockBtnText}</button>
+                <div style="margin-bottom:8px;">
+                    <b style="font-size:15px; color:#333;">${box.name}</b> ${nameEditHtml}
+                </div>
+                
+                <div class="warning-btns">
+                    <button style="${normalStyle}" onclick="setWarning('${boxId}', '')">🟢 정상</button>
+                    <button style="${overStyle}" onclick="setWarning('${boxId}', 'over')">🔴 과보유</button>
+                    <button style="${underStyle}" onclick="setWarning('${boxId}', 'under')">🟠 부족</button>
+                </div>
+                <div style="font-size:12px; margin-bottom:10px;">👤 ${box.manager_main} / ${box.manager_sub}</div>
+                
+                <div style="margin-top:10px; border-top:1px solid #eee; padding-top:8px;">
+                    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; margin-bottom:5px;">${photosHtml}</div>
+                    ${photoUploadSection}
+                </div>
+
+                <div class="mat-list"><b>📦 자재 목록</b><br>${matHtml}</div>
+                <div style="display:flex; gap:3px; margin-top:8px;">
+                    <input type="text" id="n-${boxId}" placeholder="자재명" style="width:60%; font-size:11px;">
+                    <input type="text" id="q-${boxId}" placeholder="수량" style="width:25%; font-size:11px;">
+                    <button onclick="addMat('${boxId}')" style="width:15%;">+</button>
+                </div>
+            `;
+            markers[boxId].bindPopup(content);
+        }
+
+        // [신규] 잠금 토글 기능
+        window.toggleLock = function(boxId) {
+            var box = toolboxesData[boxId];
+            box.is_locked = !box.is_locked;
+            
+            updateServer(box);
+            
+            // 드래그 속성 실시간 반영
+            if (box.is_locked) {
+                markers[boxId].dragging.disable();
+            } else {
+                markers[boxId].dragging.enable();
+            }
+            
+            updatePopupContent(boxId);
+        };
+
+        window.uploadAndResizeImage = function(event, boxId) {
+            var file = event.target.files[0]; if(!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var img = new Image();
+                img.onload = function() {
+                    var canvas = document.createElement('canvas'); var width = img.width; var height = img.height;
+                    if (width > height) { if (width > 600) { height *= 600 / width; width = 600; } } else { if (height > 480) { width *= 480 / height; height = 480; } }
+                    canvas.width = width; canvas.height = height; canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                    fetch('/api/toolboxes/' + boxId + '/photos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_data: canvas.toDataURL('image/jpeg', 0.8) }) })
+                    .then(res => res.json()).then(data => { toolboxesData[boxId].photos.push(data.photo_url); updatePopupContent(boxId); markers[boxId].openPopup(); });
+                }; img.src = e.target.result;
+            }; reader.readAsDataURL(file);
+        };
+
+        window.resetPhotos = function(boxId) { if(confirm("등록된 사진을 모두 삭제하시겠습니까?")) { toolboxesData[boxId].photos = []; updateServer(toolboxesData[boxId]); updatePopupContent(boxId); markers[boxId].openPopup(); } };
+        window.setWarning = function(boxId, status) { toolboxesData[boxId].warning = status; updateServer(toolboxesData[boxId]); renderMarker(toolboxesData[boxId]); markers[boxId].openPopup(); };
+        window.addMat = function(boxId) { var name = document.getElementById('n-' + boxId).value; var qty = document.getElementById('q-' + boxId).value; if(name) { toolboxesData[boxId].materials.push({name: name, qty: qty, note: ""}); updateServer(toolboxesData[boxId]); updatePopupContent(boxId); markers[boxId].openPopup(); searchMaterials(); } };
+        window.editName = function(boxId) { var newName = prompt("툴박스 명칭 변경:", toolboxesData[boxId].name); if(newName) { toolboxesData[boxId].name = newName; updateServer(toolboxesData[boxId]); updatePopupContent(boxId); searchMaterials(); } };
+        window.deleteToolbox = function(boxId) { if(confirm("정말 삭제할까요?")) { fetch('/api/toolboxes/' + boxId, { method: 'DELETE' }).then(() => { map.removeLayer(markers[boxId]); delete markers[boxId]; delete toolboxesData[boxId]; }); } };
+        function updateServer(box) { fetch('/api/toolboxes/' + box.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(box) }); }
+        
+        window.downloadExcel = function() {
+            let csvContent = "\uFEFF툴박스명,공정색상,정담당자,부담당자,상태,잠금여부,자재명,수량\n";
+            Object.values(toolboxesData).forEach(box => {
+                let statusStr = box.warning === 'over' ? '과보유' : (box.warning === 'under' ? '부족' : '정상');
+                let processName = { 'red':'배관', 'blue':'철의장', 'green':'전장', 'orange':'도장', 'purple':'기장', 'cyan':'계장' }[box.color] || box.color;
+                let lockStr = box.is_locked ? "잠금" : "해제";
+                if(box.materials.length === 0) { csvContent += `"${box.name}","${processName}","${box.manager_main}","${box.manager_sub}","${statusStr}","${lockStr}","없음","0"\n`; } 
+                else { box.materials.forEach(m => { csvContent += `"${box.name}","${processName}","${box.manager_main}","${box.manager_sub}","${statusStr}","${lockStr}","${m.name}","${m.qty}"\n`; }); }
+            });
+            let link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })); link.download = "야드_자재현황.csv"; link.click();
+        };
+
+        function searchMaterials() {
+            var query = document.getElementById('search-input').value.toLowerCase();
+            Object.keys(toolboxesData).forEach(id => {
+                var box = toolboxesData[id]; var innerElement = document.getElementById('inner-' + id);
+                if (!innerElement) return;
+                if (query === "") { innerElement.classList.remove('highlighted-inner', 'dimmed-inner'); markers[id].setZIndexOffset(0); return; }
+                if (box.name.toLowerCase().includes(query) || box.materials.some(m => m.name.toLowerCase().includes(query))) {
+                    innerElement.classList.add('highlighted-inner'); innerElement.classList.remove('dimmed-inner'); markers[id].setZIndexOffset(1000);
+                } else { innerElement.classList.add('dimmed-inner'); innerElement.classList.remove('highlighted-inner'); markers[id].setZIndexOffset(0); }
+            });
+        }
+
+        fetch('/api/toolboxes').then(res => res.json()).then(data => { data.forEach(box => { toolboxesData[box.id] = box; renderMarker(box); }); });
+    </script>
+</body>
+</html>
