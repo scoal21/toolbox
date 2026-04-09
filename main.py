@@ -173,29 +173,44 @@ async def delete_toolbox(box_id: str):
     upload_db_to_drive()
     return {"message": "삭제 완료"}
 
+# 🔥 사진을 구글 드라이브 파일이 아닌 DB 안에 직접 글자(Base64)로 저장하는 우회 창구
 @app.post("/api/toolboxes/{box_id}/photos")
 async def upload_photo(box_id: str, payload: dict):
     image_data = payload.get("image_data")
+    
     if not image_data:
         raise HTTPException(status_code=400, detail="사진 데이터 없음")
     
-    filename = f"{box_id}_{int(time.time())}.jpg"
-    photo_url = upload_photo_to_drive(filename, image_data)
-    
-    if photo_url:
+    try:
+        # 사진을 구글 드라이브에 파일로 만들지 않고, DB 파일 하나에 모두 통합합니다.
         conn = sqlite3.connect(DB_FILENAME)
         c = conn.cursor()
         c.execute("SELECT photos FROM toolboxes WHERE id=?", (box_id,))
         row = c.fetchone()
+        
         if row:
             photos = json.loads(row[0]) if row[0] else []
-            photos.append(photo_url)
+            
+            # 용량 최적화를 위해 최신 사진 2장만 유지
+            if len(photos) >= 2:
+                photos.pop(0) 
+                
+            # 사진 데이터(문자열)를 그대로 DB 리스트에 추가
+            photos.append(image_data)
+            
             c.execute("UPDATE toolboxes SET photos=? WHERE id=?", (json.dumps(photos), box_id))
             conn.commit()
+            
         conn.close()
+        
+        # 사진이 추가되어 뚱뚱해진 DB 파일을 구글 드라이브에 덮어쓰기 (용량 에러 안 남!)
         upload_db_to_drive()
-        return {"photo_url": photo_url}
-    raise HTTPException(status_code=500, detail="드라이브 업로드 실패")
+        
+        return {"photo_url": "db_stored"}
+        
+    except Exception as e:
+        print(f"⚠️ 사진 DB 저장 오류: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
