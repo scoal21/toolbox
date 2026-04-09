@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HD현대삼호 의장1부 툴박스 네비게이터</title>
+    <title>HD현대중공업 의장생산 툴박스 네비게이터</title>
     <style>
         body { margin: 0; padding: 0; overflow: hidden; background-color: #2c3e50; font-family: 'Malgun Gothic', sans-serif; }
         
@@ -38,7 +38,8 @@
         
         /* 사진 영역 */
         .photo-area { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; }
-        .photo-thumb { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; border: 1px solid #eee; }
+        .photo-thumb { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; border: 1px solid #eee; transition: transform 0.2s; }
+        .photo-thumb:active { transform: scale(0.95); }
         
         .action-btns { display: flex; gap: 10px; margin-top: 20px; }
         .btn-save { flex: 2; background-color: #3498db; }
@@ -98,4 +99,261 @@
         <div class="form-group">
             <label>현장 사진 (앨범 또는 카메라)</label>
             <input type="file" id="p-photo-input" accept="image/*" class="form-control" multiple>
-            <button onclick
+            <button onclick="uploadPhoto()" style="width:100%; margin-top:5px; padding:10px; background:#95a5a6; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">사진 업로드 적용</button>
+            <div id="p-photo-area" class="photo-area"></div>
+        </div>
+
+        <div class="action-btns">
+            <button class="btn btn-save" onclick="saveToolbox()">저장하기</button>
+            <button class="btn btn-delete" onclick="deleteToolbox()">삭제</button>
+        </div>
+    </div>
+
+    <div id="imageModal">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <img id="modalImage">
+    </div>
+
+    <script>
+        let toolboxes = [];
+        let currentBoxId = null;
+        let isLocked = false;
+        
+        // 1. 데이터 불러오기
+        async function loadData() {
+            try {
+                const res = await fetch('/api/toolboxes');
+                toolboxes = await res.json();
+                renderMap();
+            } catch (e) {
+                console.error('데이터 로딩 실패:', e);
+            }
+        }
+
+        // 2. 지도에 마커 그리기
+        function renderMap() {
+            const layer = document.getElementById('markers-layer');
+            layer.innerHTML = '';
+            toolboxes.forEach(box => {
+                const el = document.createElement('div');
+                el.className = 'marker';
+                if(box.warning && box.warning.trim() !== '') el.classList.add('warning-blink');
+                el.style.backgroundColor = box.color || '#3498db';
+                el.style.left = box.lat + 'px';
+                el.style.top = box.lng + 'px';
+                el.id = 'marker-' + box.id;
+
+                const label = document.createElement('div');
+                label.className = 'marker-label';
+                label.innerText = box.name;
+                el.appendChild(label);
+
+                el.addEventListener('click', (e) => {
+                    if(!isDragging) openPopup(box.id);
+                });
+
+                setupDraggable(el, box);
+                layer.appendChild(el);
+            });
+        }
+
+        // 3. 드래그 기능 세팅
+        let isDragging = false;
+        function setupDraggable(el, box) {
+            let startX, startY, initialLeft, initialTop;
+
+            const startDrag = (e) => {
+                if (isLocked) return;
+                isDragging = false;
+                e.preventDefault();
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+                startX = clientX; startY = clientY;
+                initialLeft = parseFloat(el.style.left);
+                initialTop = parseFloat(el.style.top);
+                
+                document.addEventListener('mousemove', doDrag);
+                document.addEventListener('touchmove', doDrag, {passive: false});
+                document.addEventListener('mouseup', stopDrag);
+                document.addEventListener('touchend', stopDrag);
+            };
+
+            const doDrag = (e) => {
+                isDragging = true;
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+                const dx = clientX - startX;
+                const dy = clientY - startY;
+                el.style.left = (initialLeft + dx) + 'px';
+                el.style.top = (initialTop + dy) + 'px';
+            };
+
+            const stopDrag = async (e) => {
+                document.removeEventListener('mousemove', doDrag);
+                document.removeEventListener('touchmove', doDrag);
+                document.removeEventListener('mouseup', stopDrag);
+                document.removeEventListener('touchend', stopDrag);
+                
+                if (isDragging) {
+                    box.lat = parseFloat(el.style.left);
+                    box.lng = parseFloat(el.style.top);
+                    await fetch(`/api/toolboxes/${box.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(box)
+                    });
+                }
+                setTimeout(() => { isDragging = false; }, 50);
+            };
+
+            el.addEventListener('mousedown', startDrag);
+            el.addEventListener('touchstart', startDrag, {passive: false});
+        }
+
+        // 4. 새 툴박스 추가
+        function addNewBox() {
+            const newId = 'TB-' + Date.now();
+            const newBox = {
+                id: newId, name: '새 툴박스', lat: window.innerWidth / 2, lng: 200, 
+                color: '#3498db', manager_main: '', manager_sub: '', materials: [], warning: '', photos: [], is_locked: false
+            };
+            toolboxes.push(newBox);
+            renderMap();
+            openPopup(newId);
+        }
+
+        // 5. 팝업창 열기/닫기
+        function openPopup(id) {
+            currentBoxId = id;
+            const box = toolboxes.find(b => b.id === id);
+            if(!box) return;
+
+            document.getElementById('p-name').value = box.name;
+            document.getElementById('p-manager-main').value = box.manager_main;
+            document.getElementById('p-manager-sub').value = box.manager_sub;
+            document.getElementById('p-warning').value = box.warning;
+            document.getElementById('p-color').value = box.color || '#3498db';
+            
+            const photoArea = document.getElementById('p-photo-area');
+            photoArea.innerHTML = '';
+            box.photos.forEach(p => {
+                // 사진 클릭 시 모달창(확대) 띄우는 onclick 이벤트 추가
+                photoArea.innerHTML += `<img src="${p}" class="photo-thumb" onclick="openModal('${p}')">`;
+            });
+
+            document.getElementById('popup').style.display = 'block';
+        }
+
+        function closePopup() {
+            document.getElementById('popup').style.display = 'none';
+            currentBoxId = null;
+        }
+
+        // 6. 데이터 저장
+        async function saveToolbox() {
+            const box = toolboxes.find(b => b.id === currentBoxId);
+            box.name = document.getElementById('p-name').value;
+            box.manager_main = document.getElementById('p-manager-main').value;
+            box.manager_sub = document.getElementById('p-manager-sub').value;
+            box.warning = document.getElementById('p-warning').value;
+            box.color = document.getElementById('p-color').value;
+
+            const isNew = box.name === '새 툴박스';
+            const method = isNew ? 'POST' : 'PUT';
+            const url = isNew ? '/api/toolboxes' : `/api/toolboxes/${box.id}`;
+            
+            try {
+                // 기존 API 설계에 따라 데이터가 새로 생긴 것이든 업데이트든 PUT/POST 유연하게 처리
+                await fetch(`/api/toolboxes/${box.id}`, {
+                    method: 'PUT', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(box)
+                });
+                alert('데이터가 안전하게 저장되었습니다.');
+                closePopup();
+                loadData();
+            } catch (e) {
+                alert('저장 실패: 네트워크 상태를 확인해주세요.');
+            }
+        }
+
+        // 7. 삭제
+        async function deleteToolbox() {
+            if(!confirm('정말 이 툴박스를 삭제하시겠습니까?')) return;
+            try {
+                await fetch(`/api/toolboxes/${currentBoxId}`, { method: 'DELETE' });
+                closePopup();
+                loadData();
+            } catch (e) {
+                alert('삭제 실패');
+            }
+        }
+
+        // 8. 사진 업로드 (Base64 변환 후 DB 전송)
+        function uploadPhoto() {
+            const input = document.getElementById('p-photo-input');
+            if (input.files.length === 0) {
+                alert('사진을 먼저 선택해주세요.'); return;
+            }
+            
+            const file = input.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = async function(e) {
+                const base64Data = e.target.result;
+                try {
+                    const res = await fetch(`/api/toolboxes/${currentBoxId}/photos`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image_data: base64Data })
+                    });
+                    if(res.ok) {
+                        alert('사진 등록 완료!');
+                        loadData(); 
+                        setTimeout(() => openPopup(currentBoxId), 500); // 팝업 재오픈하여 갱신
+                    } else {
+                        alert('사진 등록 실패');
+                    }
+                } catch(err) {
+                    alert('서버 통신 실패');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 9. 잠금 및 검색
+        function toggleLock() {
+            isLocked = !isLocked;
+            const btn = document.getElementById('lock-btn');
+            if(isLocked) {
+                btn.innerText = '이동 잠금 ON';
+                btn.className = 'btn btn-lock';
+            } else {
+                btn.innerText = '이동 잠금 OFF';
+                btn.className = 'btn btn-lock unlocked';
+            }
+        }
+
+        function searchBox() {
+            const text = document.getElementById('search-box').value.toLowerCase();
+            document.querySelectorAll('.marker').forEach(marker => {
+                const name = marker.querySelector('.marker-label').innerText.toLowerCase();
+                marker.style.display = name.includes(text) ? 'block' : 'none';
+            });
+        }
+
+        // 10. 사진 확대 모달 함수 (라이트박스)
+        function openModal(imgSrc) {
+            document.getElementById('modalImage').src = imgSrc;
+            document.getElementById('imageModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        // 초기 실행
+        window.onload = loadData;
+    </script>
+</body>
+</html>
